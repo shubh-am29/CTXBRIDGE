@@ -11,11 +11,12 @@
     "test": "node tests/scanner.test.js"
   },
   "dependencies": {
-    "@babel/parser": "^8.0.4",
-    "@babel/traverse": "^8.0.4",
+    "@babel/parser": "^8.0.5",
+    "@babel/traverse": "^8.0.5",
     "axios": "^1.20.0",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
-    "ora": "^5.4.1"
+    "ora": "^5.4.1",
+    "web-tree-sitter": "^0.27.0"
   }
 }
