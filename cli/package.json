@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node bin/ctxbridge.js",
-    "test": "node tests/scanner.test.js"
+    "test": "node tests/scanner.test.js && node tests/code-intelligence.test.js"
   },
   "dependencies": {
     "@babel/parser": "^8.0.5",
