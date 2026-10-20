@@ -1,29 +1,21 @@
 'use strict'
 
-const path = require('path')
-
+const {
+  EXTENSION_TO_LANGUAGE,
+  LANGUAGES,
+} = require('./language-registry')
 // ─────────────────────────────────────────────────────────────────────────────
 // Language detection by extension
 // ─────────────────────────────────────────────────────────────────────────────
 
-const EXT_LANG = {
-  '.py':   'Python',    '.pyw':  'Python',
-  '.js':   'JavaScript', '.jsx': 'JavaScript', '.mjs': 'JavaScript', '.cjs': 'JavaScript',
-  '.ts':   'TypeScript', '.tsx': 'TypeScript',
-  '.go':   'Go',
-  '.rs':   'Rust',
-  '.java': 'Java',
-  '.rb':   'Ruby',
-  '.php':  'PHP',
-  '.cs':   'C#',
-  '.cpp':  'C++',        '.cc':  'C++',        '.cxx': 'C++',
-  '.c':    'C',          '.h':   'C',
-  '.swift':'Swift',
-  '.kt':   'Kotlin',
-  '.sh':   'Shell',      '.bash':'Shell',       '.zsh': 'Shell',
-  '.sql':  'SQL',
-  '.r':    'R',
-}
+const EXT_LANG = Object.fromEntries(
+  Object.values(LANGUAGES).flatMap(language =>
+    language.extensions.map(extension => [
+      extension,
+      language.name,
+    ])
+  )
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Framework / library detection rules

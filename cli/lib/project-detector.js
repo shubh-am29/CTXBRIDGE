@@ -4,6 +4,11 @@ const fs           = require('fs')
 const path         = require('path')
 const { execSync } = require('child_process')
 
+const {
+  EXTENSION_TO_LANGUAGE: EXT_LANG,
+  LANGUAGES,
+} = require('./language-registry')
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,38 +28,12 @@ const MAX_READ_BYTES   = 10000
 const MAX_DEPTH        = 5
 const MAX_PATTERN_FILES = 60  // per language, for source scanning
 
-const EXT_LANG = {
-  '.js':   'javascript', '.jsx': 'javascript',
-  '.mjs':  'javascript', '.cjs': 'javascript',
-  '.ts':   'typescript', '.tsx': 'typescript',
-  '.py':   'python',
-  '.java': 'java',
-  '.go':   'go',
-  '.rs':   'rust',
-  '.rb':   'ruby',
-  '.php':  'php',
-  '.cs':   'csharp',
-  '.cpp':  'cpp',  '.cc': 'cpp', '.cxx': 'cpp',
-  '.c':    'c',    '.h':  'c',
-  '.swift':'swift',
-  '.kt':   'kotlin',
-  '.scala':'scala',
-  '.r':    'r',
-  '.ex':   'elixir', '.exs': 'elixir',
-  '.hs':   'haskell',
-  '.lua':  'lua',
-}
-
-const LANG_DISPLAY = {
-  javascript: 'JavaScript', typescript: 'TypeScript',
-  python:     'Python',     java:       'Java',
-  go:         'Go',         rust:       'Rust',
-  ruby:       'Ruby',       php:        'PHP',
-  csharp:     'C#',         cpp:        'C++',
-  c:          'C',          swift:      'Swift',
-  kotlin:     'Kotlin',     scala:      'Scala',
-  r:          'R',          elixir:     'Elixir',
-}
+const LANG_DISPLAY = Object.fromEntries(
+  Object.values(LANGUAGES).map(language => [
+    language.id,
+    language.name,
+  ])
+)
 
 // Files whose text content we always want cached in the snapshot
 const ALWAYS_READ = new Set([

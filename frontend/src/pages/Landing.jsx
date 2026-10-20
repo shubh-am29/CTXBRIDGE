@@ -117,7 +117,7 @@ export default function Landing() {
         <div className="cb-wrap cb-nav-inner">
           <Link to="/" className="cb-logo">
             <span className="cb-logo-mark">CB</span>
-            ContextBridge
+            CtxBridge
           </Link>
           <nav className="cb-nav-links">
             <a href="#product">Product</a>
@@ -139,7 +139,7 @@ export default function Landing() {
             <h1>
               Your AI coding agent forgets everything.
               <br />
-              <span className="cb-accent">ContextBridge</span> doesn't.
+              <span className="cb-accent">CtxBridge</span> doesn't.
             </h1>
             <p className="cb-hero-sub">
               Scan your codebase, capture how it actually works, and hand every new AI
@@ -151,7 +151,7 @@ export default function Landing() {
               <a href="#how-it-works" className="cb-btn cb-btn-outline cb-btn-lg">Explore How It Works</a>
             </div>
             <div className="cb-hero-meta">
-              <span>$ npm install -g ctxbridge</span>
+              <span>$ npm i @shu_bham_61/ctxbridge</span>
               <span>FastAPI · React · Supabase</span>
             </div>
           </div>
