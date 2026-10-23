@@ -2,6 +2,7 @@
 
 const fs   = require('fs')
 const path = require('path')
+const { LANGUAGES } = require('./language-registry')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -49,6 +50,14 @@ const ALLOWED_EXTENSIONS = new Set([
   '.sql', '.prisma', '.graphql', '.gql',
   '.dockerfile', '.containerfile',
 ])
+
+// Include extensions supported by the shared language registry.
+// Keep the existing allowlist for configuration and documentation files.
+for (const language of Object.values(LANGUAGES)) {
+  for (const extension of language.extensions) {
+    ALLOWED_EXTENSIONS.add(extension)
+  }
+}
 
 // Exact filenames always included (even without common extension)
 const ALWAYS_INCLUDE_NAMES = new Set([
