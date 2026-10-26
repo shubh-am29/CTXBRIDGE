@@ -162,7 +162,7 @@ function extractSymbols(rootNode) {
 
 // ── Import extraction ───────────────────────────────────────────────────────
 //
-// Each import is { text, line, source, kind }:
+// Each import is { text, line, source, kind, names  }:
 //   text   : the source text of the statement / call
 //   line   : 1-based start line
 //   source : the module specifier exactly as written ('./a', 'fs',
@@ -170,6 +170,15 @@ function extractSymbols(rootNode) {
 //            determined statically
 //   kind   : 'import' (ESM / Python) | 'require' (CommonJS, and TS
 //            `import x = require()`) | 'dynamic_import' (`import('x')`)
+ //   kind   : 'import' (ESM / Python) | 'require' (CommonJS, and TS
+ //            `import x = require()`) | 'dynamic_import' (`import('x')`)
+ //
++//   names  : for a Python `from X import a, b as c` an array of the ORIGINAL
++//            imported names (['a', 'b']), or ['*'] for a wildcard import.
++//            null for everything else (JS/TS named imports are not captured).
++//            Needed because `from pkg import mod` may import a submodule.
++//
+ // A Python `import a, b` is one statement with two modules, so it yields
 //
 // A Python `import a, b` is one statement with two modules, so it yields
 // one entry per module (same text and line).
@@ -215,24 +224,49 @@ function pythonModuleNames(node) {
   }
   return names
 }
+function pythonImportedNames(node) {
+  const names = []
+
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i)
+    if (!child.isNamed) continue
+
+    if (child.type === 'wildcard_import') {
+      names.push('*')
+    } else if (node.fieldNameForChild(i) === 'name') {
+      if (child.type === 'dotted_name') {
+        names.push(child.text)
+      } else if (child.type === 'aliased_import') {
+        const inner = child.childForFieldName('name')
+        if (inner) names.push(inner.text)
+      }
+    }
+  }
+
+  return names
+}
 
 function extractImports(rootNode, languageId) {
   const imports = []
   const isPython = languageId === 'python'
 
-  const add = (node, source, kind) => imports.push({
+  const add = (node, source, kind, names = null) => imports.push({
     text: node.text,
     line: node.startPosition.row + 1,
     source,
     kind,
+    names,
   })
 
   function visit(node) {
     if (node.type === 'import_statement' || node.type === 'import_from_statement') {
       if (isPython) {
         const names = pythonModuleNames(node)
-        if (names.length === 0) add(node, null, 'import')
-        for (const name of names) add(node, name, 'import')
+        const importedNames = node.type === 'import_from_statement'
+          ? pythonImportedNames(node)
+          : null
+        if (names.length === 0) add(node, null, 'import', importedNames)
+        for (const name of names) add(node, name, 'import', importedNames)
       } else {
         // TypeScript `import x = require('y')` keeps its specifier on the
         // import_require_clause instead of on the statement itself.

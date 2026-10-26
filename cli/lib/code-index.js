@@ -1,3 +1,4 @@
+
 'use strict'
 
 const fs = require('fs')
@@ -5,6 +6,7 @@ const path = require('path')
 const { parseSource, SUPPORTED_LANGUAGES } = require('./parser')
 const { getLanguageId } = require('./language-registry')
 const { MAX_FILE_SIZE_BYTES } = require('./scanner')
+const { resolveImports } = require('./import-resolver')
 
 const DEFAULT_CONCURRENCY = 8
 
@@ -25,12 +27,14 @@ const DEFAULT_CONCURRENCY = 8
  *    skipped, never read.
  *  - one unreadable or unparseable file never aborts the rest.
  *
- * @param {Array<{path: string, ext?: string}>} files  scanner output
- * @param {object}  [options]
- * @param {string}  [options.cwd=process.cwd()]       project root
- * @param {number}  [options.concurrency=8]           parallel parses
- * @param {number}  [options.maxFileBytes]            per-file size cap
- * @returns {Promise<{files: object[], skipped: object[], summary: object}>}
+ * @param {Array<{path: string, ext?: string}>} files scanner output
+ * @param {object} [options]
+ * @param {string} [options.cwd=process.cwd()] project root
+ * @param {number} [options.concurrency=8] parallel parses
+ * @param {number} [options.maxFileBytes] per-file size cap
+ * @returns {Promise<{files: object[], skipped: object[], graph: object, summary: object}>}
+ *   `graph` holds the resolved dependency edges between indexed files, plus
+ *   unresolved imports and external packages (see import-resolver.js).
  */
 async function buildCodeIndex(files, options = {}) {
   if (!Array.isArray(files)) {
@@ -80,12 +84,16 @@ async function buildCodeIndex(files, options = {}) {
     try {
       realAbs = await fs.promises.realpath(abs)
     } catch {
-      slots[index] = { skipped: { path: relPath, reason: 'could not read file' } }
+      slots[index] = {
+        skipped: { path: relPath, reason: 'could not read file' },
+      }
       return
     }
 
     if (realAbs !== realRoot && !realAbs.startsWith(realRoot + path.sep)) {
-      slots[index] = { skipped: { path: relPath, reason: 'outside project root' } }
+      slots[index] = {
+        skipped: { path: relPath, reason: 'outside project root' },
+      }
       return
     }
 
@@ -93,7 +101,9 @@ async function buildCodeIndex(files, options = {}) {
     try {
       const stat = await fs.promises.stat(realAbs)
       if (!stat.isFile()) {
-        slots[index] = { skipped: { path: relPath, reason: 'not a regular file' } }
+        slots[index] = {
+          skipped: { path: relPath, reason: 'not a regular file' },
+        }
         return
       }
       if (stat.size > maxFileBytes) {
@@ -107,7 +117,9 @@ async function buildCodeIndex(files, options = {}) {
       }
       source = await fs.promises.readFile(realAbs, 'utf8')
     } catch {
-      slots[index] = { skipped: { path: relPath, reason: 'could not read file' } }
+      slots[index] = {
+        skipped: { path: relPath, reason: 'could not read file' },
+      }
       return
     }
 
@@ -160,9 +172,13 @@ async function buildCodeIndex(files, options = {}) {
     byLanguage[entry.language] = (byLanguage[entry.language] || 0) + 1
   }
 
+  // Resolve imports into dependency edges between indexed files.
+  const graph = resolveImports(indexed)
+
   return {
     files: indexed,
     skipped,
+    graph,
     summary: {
       parsed: indexed.length,
       skipped: skipped.length,
@@ -172,6 +188,11 @@ async function buildCodeIndex(files, options = {}) {
       imports: indexed.reduce((n, e) => n + e.imports.length, 0),
       exports: indexed.reduce((n, e) => n + e.exports.length, 0),
       byLanguage,
+      edges: graph.edges.length,
+      uniqueEdges: new Set(graph.edges.map(e => e.from + '\u0000' + e.to)).size,
+      unresolvedImports: graph.unresolved.length,
+      externalPackages: Object.keys(graph.external.packages).length,
+      builtinModules: Object.keys(graph.external.builtins).length,
     },
   }
 }

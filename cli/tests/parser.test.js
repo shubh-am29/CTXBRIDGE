@@ -1,3 +1,4 @@
+
 'use strict'
 
 const assert = require('assert')
@@ -240,6 +241,7 @@ test('Python: does not report JS-style exports', async () => {
   const r = await parseSource({ source: 'def f(): pass', extension: '.py' })
   assert.deepStrictEqual(r.exports, [])
 })
+
 // ── Import specifiers and require() ─────────────────────────────────────────
 const sources = r => r.imports.map(i => i.source)
 const kinds = r => r.imports.map(i => i.kind)
@@ -376,6 +378,39 @@ test('Python: one entry per module in a multi-module import, aliases resolved', 
 test('Python: require() is not treated as an import', async () => {
   const r = await parseSource({ source: "x = require('./a')", extension: '.py' })
   assert.deepStrictEqual(r.imports, [])
+})
+
+// ── Python imported names ───────────────────────────────────────────────────
+test('Python: from-import records the original imported names', async () => {
+  const src = 'from app.api import projects, memory as mem, sessions'
+  const r = await parseSource({ source: src, extension: '.py' })
+  assert.strictEqual(r.imports.length, 1)
+  assert.strictEqual(r.imports[0].source, 'app.api')
+  assert.deepStrictEqual(r.imports[0].names, ['projects', 'memory', 'sessions'])
+})
+
+test('Python: parenthesised multi-line from-import lists every name', async () => {
+  const src = 'from a import (\n    b,\n    c as d,\n    e,\n)'
+  const r = await parseSource({ source: src, extension: '.py' })
+  assert.deepStrictEqual(r.imports[0].names, ['b', 'c', 'e'])
+})
+
+test('Python: wildcard and relative from-imports', async () => {
+  const src = 'from x import *\nfrom . import y\nfrom .mod import z'
+  const r = await parseSource({ source: src, extension: '.py' })
+  assert.deepStrictEqual(r.imports.map(i => i.names), [['*'], ['y'], ['z']])
+  assert.deepStrictEqual(r.imports.map(i => i.source), ['x', '.', '.mod'])
+})
+
+test('Python: plain `import a, b` has no names (null)', async () => {
+  const r = await parseSource({ source: 'import os, sys', extension: '.py' })
+  assert.deepStrictEqual(r.imports.map(i => i.names), [null, null])
+})
+
+test('JS/TS imports have names null (not captured)', async () => {
+  const src = "import { a, b } from './x'\nconst c = require('./y')"
+  const r = await parseSource({ source: src, extension: '.js' })
+  assert.deepStrictEqual(r.imports.map(i => i.names), [null, null])
 })
 
 // ── Robustness ──────────────────────────────────────────────────────────────

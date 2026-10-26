@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node bin/ctxbridge.js",
-    "test": "node tests/scanner.test.js && node tests/language-registry.test.js && node tests/parser.test.js && node tests/code-index.test.js"
+    "test": "node tests/scanner.test.js && node tests/language-registry.test.js && node tests/parser.test.js && node tests/code-index.test.js && node tests/import-resolver.test.js"
   },
   "dependencies": {
     "@babel/parser": "^8.0.5",

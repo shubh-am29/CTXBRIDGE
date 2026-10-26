@@ -1,3 +1,4 @@
+
 'use strict'
 
 const assert = require('assert')
@@ -38,6 +39,7 @@ test('indexes python, javascript, typescript and tsx files', async () => {
     'c.ts': 'export interface Shape { x: number }\n',
     'd.tsx': 'export function Comp() { return <div/> }\n',
   }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir })
@@ -48,15 +50,25 @@ test('indexes python, javascript, typescript and tsx files', async () => {
     assert.strictEqual(entryFor(r, 'b.js').exports[0].name, 'jsFn')
     assert.strictEqual(entryFor(r, 'c.ts').exports[0].kind, 'interface')
     assert.strictEqual(entryFor(r, 'd.tsx').hasErrors, false)
-    assert.deepStrictEqual(r.summary.byLanguage, { python: 1, javascript: 1, typescript: 2 })
+    assert.deepStrictEqual(r.summary.byLanguage, {
+      python: 1,
+      javascript: 1,
+      typescript: 2,
+    })
   })
 })
 
 test('unsupported files are counted, not reported as skipped', async () => {
-  const layout = { 'a.js': 'const x = 1', 'README.md': '# hi', 'data.json': '{}' }
+  const layout = {
+    'a.js': 'const x = 1',
+    'README.md': '# hi',
+    'data.json': '{}',
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir })
+
     assert.strictEqual(r.summary.parsed, 1)
     assert.strictEqual(r.summary.unsupported, 2)
     assert.deepStrictEqual(r.skipped, [])
@@ -65,6 +77,7 @@ test('unsupported files are counted, not reported as skipped', async () => {
 
 test('empty input returns an empty, well-formed index', async () => {
   const r = await buildCodeIndex([])
+
   assert.deepStrictEqual(r.files, [])
   assert.deepStrictEqual(r.skipped, [])
   assert.strictEqual(r.summary.parsed, 0)
@@ -98,12 +111,16 @@ test('symbols after the scanner truncation point are still found', async () => {
     assert.ok(!files[0].content.includes('lateFunction'), 'scanner copy should miss it')
 
     // ...so parsing the scanner's copy loses the symbol (the bug we avoid)...
-    const naive = await parseSource({ source: files[0].content, extension: '.js' })
+    const naive = await parseSource({
+      source: files[0].content,
+      extension: '.js',
+    })
     assert.ok(!naive.symbols.some(s => s.name === 'lateFunction'))
 
     // ...but the code index re-reads the full file and finds it.
     const r = await buildCodeIndex(files, { cwd: dir })
     const entry = entryFor(r, 'big.js')
+
     assert.ok(entry.symbols.some(s => s.name === 'lateFunction'), 'symbol must be found')
     assert.ok(entry.exports.some(e => e.name === 'lateFunction'), 'export must be found')
     assert.strictEqual(entry.hasErrors, false)
@@ -113,21 +130,32 @@ test('symbols after the scanner truncation point are still found', async () => {
 // ── Ordering and concurrency ────────────────────────────────────────────────
 test('output order matches input order', async () => {
   const layout = {}
-  for (let i = 0; i < 20; i++) layout[`f${String(i).padStart(2, '0')}.js`] = `export const v${i} = ${i}\n`
+  for (let i = 0; i < 20; i++) {
+    layout[`f${String(i).padStart(2, '0')}.js`] = `export const v${i} = ${i}\n`
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir, concurrency: 8 })
-    assert.deepStrictEqual(r.files.map(f => f.path), files.map(f => f.path))
+
+    assert.deepStrictEqual(
+      r.files.map(f => f.path),
+      files.map(f => f.path)
+    )
   })
 })
 
 test('results are identical for concurrency 1 and 16', async () => {
   const layout = {}
-  for (let i = 0; i < 12; i++) layout[`m${i}.ts`] = `export function fn${i}(): void {}\n`
+  for (let i = 0; i < 12; i++) {
+    layout[`m${i}.ts`] = `export function fn${i}(): void {}\n`
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const a = await buildCodeIndex(files, { cwd: dir, concurrency: 1 })
     const b = await buildCodeIndex(files, { cwd: dir, concurrency: 16 })
+
     assert.deepStrictEqual(a, b)
   })
 })
@@ -139,9 +167,11 @@ test('a syntax-error file is flagged but does not stop other files', async () =>
     'bad.ts': 'export function broken( {\n',
     'good2.py': 'def fine(): pass\n',
   }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir })
+
     assert.strictEqual(r.summary.parsed, 3)
     assert.strictEqual(r.summary.withErrors, 1)
     assert.strictEqual(entryFor(r, 'bad.ts').hasErrors, true)
@@ -151,21 +181,34 @@ test('a syntax-error file is flagged but does not stop other files', async () =>
 })
 
 test('a file deleted after the scan is skipped, others still indexed', async () => {
-  const layout = { 'keep.js': 'export const a = 1\n', 'gone.js': 'export const b = 2\n' }
+  const layout = {
+    'keep.js': 'export const a = 1\n',
+    'gone.js': 'export const b = 2\n',
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     fs.rmSync(path.join(dir, 'gone.js'))
+
     const r = await buildCodeIndex(files, { cwd: dir })
+
     assert.strictEqual(r.summary.parsed, 1)
-    assert.deepStrictEqual(r.skipped, [{ path: 'gone.js', reason: 'could not read file' }])
+    assert.deepStrictEqual(r.skipped, [
+      { path: 'gone.js', reason: 'could not read file' },
+    ])
   })
 })
 
 test('files over the size cap are skipped with a reason', async () => {
-  const layout = { 'small.js': 'export const a = 1\n', 'large.js': 'x'.repeat(5000) }
+  const layout = {
+    'small.js': 'export const a = 1\n',
+    'large.js': 'x'.repeat(5000),
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir, maxFileBytes: 1000 })
+
     assert.strictEqual(r.summary.parsed, 1)
     assert.strictEqual(r.skipped.length, 1)
     assert.strictEqual(r.skipped[0].path, 'large.js')
@@ -176,18 +219,29 @@ test('files over the size cap are skipped with a reason', async () => {
 // ── Path safety ─────────────────────────────────────────────────────────────
 test('a ../ path escaping the project root is never read', async () => {
   const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxbridge-outer-'))
+
   try {
-    fs.writeFileSync(path.join(outer, 'secret.js'), 'export const SECRET = 1\n')
+    fs.writeFileSync(
+      path.join(outer, 'secret.js'),
+      'export const SECRET = 1\n'
+    )
+
     const project = path.join(outer, 'project')
     fs.mkdirSync(project)
     fs.writeFileSync(path.join(project, 'ok.js'), 'export const ok = 1\n')
 
     const r = await buildCodeIndex(
-      [{ path: 'ok.js', ext: '.js' }, { path: '../secret.js', ext: '.js' }],
+      [
+        { path: 'ok.js', ext: '.js' },
+        { path: '../secret.js', ext: '.js' },
+      ],
       { cwd: project }
     )
+
     assert.strictEqual(r.summary.parsed, 1)
-    assert.deepStrictEqual(r.skipped, [{ path: '../secret.js', reason: 'outside project root' }])
+    assert.deepStrictEqual(r.skipped, [
+      { path: '../secret.js', reason: 'outside project root' },
+    ])
     assert.ok(!JSON.stringify(r).includes('SECRET'), 'outside content must not leak')
   } finally {
     fs.rmSync(outer, { recursive: true, force: true })
@@ -196,17 +250,31 @@ test('a ../ path escaping the project root is never read', async () => {
 
 test('a symlink pointing outside the project root is never read', async () => {
   const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxbridge-link-'))
+
   try {
-    fs.writeFileSync(path.join(outer, 'secret.js'), 'export const LEAKED = 1\n')
+    fs.writeFileSync(
+      path.join(outer, 'secret.js'),
+      'export const LEAKED = 1\n'
+    )
+
     const project = path.join(outer, 'project')
     fs.mkdirSync(project)
+
     try {
-      fs.symlinkSync(path.join(outer, 'secret.js'), path.join(project, 'link.js'))
+      fs.symlinkSync(
+        path.join(outer, 'secret.js'),
+        path.join(project, 'link.js')
+      )
     } catch {
       console.log('    (symlinks not permitted here — skipping)')
       return
     }
-    const r = await buildCodeIndex([{ path: 'link.js', ext: '.js' }], { cwd: project })
+
+    const r = await buildCodeIndex(
+      [{ path: 'link.js', ext: '.js' }],
+      { cwd: project }
+    )
+
     assert.strictEqual(r.summary.parsed, 0)
     assert.strictEqual(r.skipped[0].reason, 'outside project root')
     assert.ok(!JSON.stringify(r).includes('LEAKED'))
@@ -217,21 +285,145 @@ test('a symlink pointing outside the project root is never read', async () => {
 
 test('a directory named like a source file is skipped, not parsed', async () => {
   await withProject({ 'dir.js/inner.txt': 'x' }, async dir => {
-    const r = await buildCodeIndex([{ path: 'dir.js', ext: '.js' }], { cwd: dir })
+    const r = await buildCodeIndex(
+      [{ path: 'dir.js', ext: '.js' }],
+      { cwd: dir }
+    )
+
     assert.strictEqual(r.summary.parsed, 0)
     assert.strictEqual(r.skipped[0].reason, 'not a regular file')
   })
 })
 
-// ── Integration with the real scanner's exclusions ──────────────────────────
+// ── Integration with the real scanner's exclusions ─────────────────────────
 test('files the scanner excludes (e.g. .env) never reach the index', async () => {
-  const layout = { 'app.js': 'export const a = 1\n', '.env': 'API_KEY=hunter2\n' }
+  const layout = {
+    'app.js': 'export const a = 1\n',
+    '.env': 'API_KEY=hunter2\n',
+  }
+
   await withProject(layout, async dir => {
     const { files } = scanProjectFiles(dir)
     const r = await buildCodeIndex(files, { cwd: dir })
+
     assert.strictEqual(r.summary.parsed, 1)
     assert.ok(!JSON.stringify(r).includes('hunter2'))
   })
+})
+
+// ── Dependency graph (resolved imports) ─────────────────────────────────────
+test('graph: CommonJS require() between real files becomes an edge', async () => {
+  const layout = {
+    'cli/a.js': "const b = require('./b')\nconst chalk = require('chalk')\nconst fs = require('fs')\n",
+    'cli/b.js': 'module.exports = {}\n',
+  }
+
+  await withProject(layout, async dir => {
+    const { files } = scanProjectFiles(dir)
+    const r = await buildCodeIndex(files, { cwd: dir })
+
+    assert.deepStrictEqual(r.graph.edges, [
+      { from: 'cli/a.js', to: 'cli/b.js', kind: 'require', line: 1 },
+    ])
+    assert.deepStrictEqual(r.graph.external.packages, { chalk: 1 })
+    assert.deepStrictEqual(r.graph.external.builtins, { fs: 1 })
+    assert.deepStrictEqual(r.graph.unresolved, [])
+  })
+})
+
+test('graph: Python `from pkg import module` links the module files', async () => {
+  const layout = {
+    'backend/app/main.py': 'from app.api import projects, memory\nfrom fastapi import FastAPI\n',
+    'backend/app/api/__init__.py': '',
+    'backend/app/api/projects.py': 'x = 1\n',
+    'backend/app/api/memory.py': 'y = 2\n',
+  }
+
+  await withProject(layout, async dir => {
+    const { files } = scanProjectFiles(dir)
+    const r = await buildCodeIndex(files, { cwd: dir })
+
+    assert.deepStrictEqual(
+      r.graph.edges.map(e => e.to).sort(),
+      ['backend/app/api/memory.py', 'backend/app/api/projects.py']
+    )
+    assert.deepStrictEqual(r.graph.external.packages, { fastapi: 1 })
+  })
+})
+
+test('graph: TS barrel file re-exports become edges', async () => {
+  const layout = {
+    'src/index.ts': "export * from './a'\nexport { b } from './b'\n",
+    'src/a.ts': 'export const a = 1\n',
+    'src/b.ts': 'export const b = 2\n',
+  }
+
+  await withProject(layout, async dir => {
+    const { files } = scanProjectFiles(dir)
+    const r = await buildCodeIndex(files, { cwd: dir })
+
+    assert.deepStrictEqual(
+      r.graph.edges.map(e => `${e.from}->${e.to}:${e.kind}`),
+      [
+        'src/index.ts->src/a.ts:reexport',
+        'src/index.ts->src/b.ts:reexport',
+      ]
+    )
+  })
+})
+
+test('graph: import of a file the index skipped is reported unresolved', async () => {
+  const layout = {
+    'a.js': "const big = require('./big')\n",
+    'big.js': 'x'.repeat(5000),
+  }
+
+  await withProject(layout, async dir => {
+    const { files } = scanProjectFiles(dir)
+    const r = await buildCodeIndex(files, {
+      cwd: dir,
+      maxFileBytes: 1000,
+    })
+
+    assert.deepStrictEqual(r.graph.edges, [])
+    assert.strictEqual(r.graph.unresolved[0].source, './big')
+    assert.strictEqual(
+      r.graph.unresolved[0].reason,
+      'target not found in index'
+    )
+  })
+})
+
+test('graph: summary reports edge, unresolved and external counts', async () => {
+  const layout = {
+    'a.js': "require('./b')\nrequire('./b')\nrequire('./missing')\nrequire('chalk')\nrequire('fs')\n",
+    'b.js': 'module.exports = 1\n',
+  }
+
+  await withProject(layout, async dir => {
+    const { files } = scanProjectFiles(dir)
+    const { summary } = await buildCodeIndex(files, { cwd: dir })
+
+    assert.strictEqual(summary.edges, 2)
+    assert.strictEqual(summary.uniqueEdges, 1)
+    assert.strictEqual(summary.unresolvedImports, 1)
+    assert.strictEqual(summary.externalPackages, 1)
+    assert.strictEqual(summary.builtinModules, 1)
+  })
+})
+
+test('graph: empty input yields an empty graph', async () => {
+  const r = await buildCodeIndex([])
+
+  assert.deepStrictEqual(r.graph, {
+    edges: [],
+    unresolved: [],
+    external: {
+      packages: {},
+      builtins: {},
+    },
+  })
+  assert.strictEqual(r.summary.edges, 0)
 })
 
 // ── Runner ──────────────────────────────────────────────────────────────────
